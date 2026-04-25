@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+gradle/
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+
+# Java
+*.class
+*.jar
+*.log
+
+# Mod specific
+config/savelogins/
