@@ -1,197 +1,170 @@
 package com.savelogins.command;
 
-import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.savelogins.StorageManager;
 import com.savelogins.ServerTracker;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 
-import java.util.Optional;
-
 /**
- * Registers client-side commands for SaveLogins mod.
+ * Client-side commands that work on ANY server (vanilla compatible).
+ * Opens chat with command pre-filled - user just presses Enter.
  */
 public class SaveLoginsCommands {
 
     public static void register(StorageManager storage, ServerTracker serverTracker) {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-            registerCommands(dispatcher, storage, serverTracker);
+            
+            // /alogin - auto login
+            dispatcher.register(
+                net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("alogin")
+                    .executes(context -> handleLogin(storage, serverTracker, context.getSource()))
+            );
+            
+            // /al - alias
+            dispatcher.register(
+                net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("al")
+                    .executes(context -> handleLogin(storage, serverTracker, context.getSource()))
+            );
+            
+            // /aregister <password>
+            dispatcher.register(
+                net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("aregister")
+                    .then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("password", 
+                        com.mojang.brigadier.arguments.StringArgumentType.word())
+                        .executes(context -> handleRegister(storage, serverTracker, context))
+                    )
+            );
+            
+            // /ar - alias
+            dispatcher.register(
+                net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("ar")
+                    .then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("password", 
+                        com.mojang.brigadier.arguments.StringArgumentType.word())
+                        .executes(context -> handleRegister(storage, serverTracker, context))
+                    )
+            );
+            
+            // /aremove
+            dispatcher.register(
+                net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("aremove")
+                    .executes(context -> handleRemove(storage, serverTracker, context.getSource()))
+            );
+            
+            // /alist
+            dispatcher.register(
+                net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("alist")
+                    .executes(context -> handleList(storage, context.getSource()))
+            );
+            
+            // /ahelp
+            dispatcher.register(
+                net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("ahelp")
+                    .executes(context -> handleHelp(context.getSource()))
+            );
         });
     }
     
-    private static void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher, 
-                                         StorageManager storage, ServerTracker serverTracker) {
+    private static int handleLogin(StorageManager storage, ServerTracker serverTracker, FabricClientCommandSource source) {
+        String serverId = serverTracker.getCurrentServer();
+        if (serverId == null) {
+            source.sendFeedback(Component.literal("§cNot connected to a server!"));
+            return 0;
+        }
         
-        // /alogin command
-        dispatcher.register(
-            ClientCommandManager.literal("alogin")
-                .executes(context -> {
-                    String serverId = serverTracker.getCurrentServer();
-                    if (serverId == null) {
-                        context.getSource().sendFeedback(Component.literal("§cNot connected to a server!"));
-                        return 0;
-                    }
-                    
-                    Optional<String> passwordOpt = storage.getPassword(serverId);
-                    if (passwordOpt.isEmpty()) {
-                        context.getSource().sendFeedback(Component.literal("§cNo password stored for §e" + serverId));
-                        context.getSource().sendFeedback(Component.literal("§cUse /aregister <password> to save your password first."));
-                        return 0;
-                    }
-                    
-                    String password = passwordOpt.get();
-                    sendChat("/login " + password);
-                    context.getSource().sendFeedback(Component.literal("§aLogging in to §e" + serverId + "§a..."));
-                    return 1;
-                })
-        );
+        var passwordOpt = storage.getPassword(serverId);
+        if (passwordOpt.isEmpty()) {
+            source.sendFeedback(Component.literal("§cNo password stored for §e" + serverId));
+            source.sendFeedback(Component.literal("§cUse /ar <password> to save it first."));
+            return 0;
+        }
         
-        // /al alias
-        dispatcher.register(
-            ClientCommandManager.literal("al")
-                .executes(context -> {
-                    String serverId = serverTracker.getCurrentServer();
-                    if (serverId == null) {
-                        context.getSource().sendFeedback(Component.literal("§cNot connected to a server!"));
-                        return 0;
-                    }
-                    
-                    Optional<String> passwordOpt = storage.getPassword(serverId);
-                    if (passwordOpt.isEmpty()) {
-                        context.getSource().sendFeedback(Component.literal("§cNo password stored for §e" + serverId));
-                        context.getSource().sendFeedback(Component.literal("§cUse /aregister <password> to save your password first."));
-                        return 0;
-                    }
-                    
-                    String password = passwordOpt.get();
-                    sendChat("/login " + password);
-                    context.getSource().sendFeedback(Component.literal("§aLogging in to §e" + serverId + "§a..."));
-                    return 1;
-                })
-        );
+        String password = passwordOpt.get();
         
-        // /aregister <password>
-        dispatcher.register(
-            ClientCommandManager.literal("aregister")
-                .then(ClientCommandManager.argument("password", StringArgumentType.word())
-                    .executes(context -> {
-                        String serverId = serverTracker.getCurrentServer();
-                        if (serverId == null) {
-                            context.getSource().sendFeedback(Component.literal("§cNot connected to a server!"));
-                            return 0;
-                        }
-                        
-                        String password = StringArgumentType.getString(context, "password");
-                        storage.savePassword(serverId, password);
-                        context.getSource().sendFeedback(Component.literal("§aPassword saved for §e" + serverId));
-                        return 1;
-                    })
-                )
-        );
+        // Open chat with /login command pre-filled - works on ANY server
+        openChatWithCommand("/login " + password);
         
-        // /ar alias
-        dispatcher.register(
-            ClientCommandManager.literal("ar")
-                .then(ClientCommandManager.argument("password", StringArgumentType.word())
-                    .executes(context -> {
-                        String serverId = serverTracker.getCurrentServer();
-                        if (serverId == null) {
-                            context.getSource().sendFeedback(Component.literal("§cNot connected to a server!"));
-                            return 0;
-                        }
-                        
-                        String password = StringArgumentType.getString(context, "password");
-                        storage.savePassword(serverId, password);
-                        context.getSource().sendFeedback(Component.literal("§aPassword saved for §e" + serverId));
-                        return 1;
-                    })
-                )
-        );
-        
-        // /aremove
-        dispatcher.register(
-            ClientCommandManager.literal("aremove")
-                .executes(context -> {
-                    String serverId = serverTracker.getCurrentServer();
-                    if (serverId == null) {
-                        context.getSource().sendFeedback(Component.literal("§cNot connected to a server!"));
-                        return 0;
-                    }
-                    
-                    storage.removePassword(serverId);
-                    context.getSource().sendFeedback(Component.literal("§aPassword removed for §e" + serverId));
-                    return 1;
-                })
-        );
-        
-        // /alist
-        dispatcher.register(
-            ClientCommandManager.literal("alist")
-                .executes(context -> {
-                    var servers = storage.getStoredServers();
-                    if (servers.isEmpty()) {
-                        context.getSource().sendFeedback(Component.literal("§eNo passwords stored."));
-                        return 0;
-                    }
-                    
-                    context.getSource().sendFeedback(Component.literal("§eStored servers:"));
-                    for (String serverId : servers.keySet()) {
-                        context.getSource().sendFeedback(Component.literal("§7- §e" + serverId));
-                    }
-                    return 1;
-                })
-        );
-        
-        // /ahelp
-        dispatcher.register(
-            ClientCommandManager.literal("ahelp")
-                .executes(context -> {
-                    context.getSource().sendFeedback(Component.literal("§eSaveLogins Commands:"));
-                    context.getSource().sendFeedback(Component.literal("§7/al §e- Auto-login with stored password"));
-                    context.getSource().sendFeedback(Component.literal("§7/ar <password> §e- Save password for current server"));
-                    context.getSource().sendFeedback(Component.literal("§7/aremove §e- Remove password for current server"));
-                    context.getSource().sendFeedback(Component.literal("§7/alist §e- List stored servers"));
-                    return 1;
-                })
-        );
+        source.sendFeedback(Component.literal("§aLogging in to §e" + serverId + "§a... §7(Press Enter)"));
+        return 1;
     }
     
-    private static void sendChat(String message) {
+    private static int handleRegister(StorageManager storage, ServerTracker serverTracker, 
+                                      com.mojang.brigadier.context.CommandContext<FabricClientCommandSource> context) {
+        String serverId = serverTracker.getCurrentServer();
+        if (serverId == null) {
+            context.getSource().sendFeedback(Component.literal("§cNot connected to a server!"));
+            return 0;
+        }
+        
+        String password = com.mojang.brigadier.arguments.StringArgumentType.getString(context, "password");
+        
+        // Save password
+        storage.savePassword(serverId, password);
+        
+        // Also send /register to server
+        openChatWithCommand("/register " + password + " " + password);
+        
+        context.getSource().sendFeedback(Component.literal("§aPassword saved for §e" + serverId));
+        context.getSource().sendFeedback(Component.literal("§7Sending /register... §7(Press Enter)"));
+        return 1;
+    }
+    
+    private static int handleRemove(StorageManager storage, ServerTracker serverTracker, FabricClientCommandSource source) {
+        String serverId = serverTracker.getCurrentServer();
+        if (serverId == null) {
+            source.sendFeedback(Component.literal("§cNot connected to a server!"));
+            return 0;
+        }
+        
+        storage.removePassword(serverId);
+        source.sendFeedback(Component.literal("§aPassword removed for §e" + serverId));
+        return 1;
+    }
+    
+    private static int handleList(StorageManager storage, FabricClientCommandSource source) {
+        var servers = storage.getStoredServers();
+        if (servers.isEmpty()) {
+            source.sendFeedback(Component.literal("§eNo passwords stored."));
+            return 0;
+        }
+        
+        source.sendFeedback(Component.literal("§eStored servers:"));
+        for (String serverId : servers.keySet()) {
+            source.sendFeedback(Component.literal("§7- §e" + serverId));
+        }
+        return 1;
+    }
+    
+    private static int handleHelp(FabricClientCommandSource source) {
+        source.sendFeedback(Component.literal("§e§lSaveLogins Commands:"));
+        source.sendFeedback(Component.literal("§7/al §e- Auto-login (opens chat)"));
+        source.sendFeedback(Component.literal("§7/ar <pass> §e- Save password"));
+        source.sendFeedback(Component.literal("§7/aremove §e- Delete password"));
+        source.sendFeedback(Component.literal("§7/alist §e- List servers"));
+        return 1;
+    }
+    
+    /**
+     * Opens chat screen with command pre-filled. Works on ANY server.
+     */
+    private static void openChatWithCommand(String command) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            try {
-                // Find connection field on player (field_3728 in yarn 1.21.11)
-                var connField = mc.player.getClass().getDeclaredField("field_3728");
-                connField.setAccessible(true);
-                Object connection = connField.get(mc.player);
-                if (connection != null) {
-                    // Find the sendPacket or send method
-                    for (var method : connection.getClass().getMethods()) {
-                        if (method.getName().equals("sendPacket") || method.getName().contains("send")) {
-                            Class<?>[] params = method.getParameterTypes();
-                            if (params.length == 1) {
-                                try {
-                                    Class<?> packetClass = Class.forName("net.minecraft.network.packet.c2s.play.ChatMessageC2SPacket");
-                                    if (params[0].isAssignableFrom(packetClass)) {
-                                        var constructor = packetClass.getConstructor(String.class);
-                                        var packet = constructor.newInstance(message);
-                                        method.invoke(connection, packet);
-                                        return;
-                                    }
-                                } catch (ClassNotFoundException e) {
-                                    // Try ChatMessageC2SPacket with different package
-                                }
-                            }
-                        }
-                    }
+        if (mc != null && mc.player != null) {
+            mc.execute(() -> {
+                try {
+                    // Find the ChatScreen class (obfuscated)
+                    Class<?> chatScreenClass = Class.forName("net.minecraft.class_328");
+                    // Get constructor that takes String (initial message)
+                    var constructor = chatScreenClass.getConstructor(String.class);
+                    Object screen = constructor.newInstance(command);
+                    // Get Minecraft.setScreen(Screen) method (obfuscated)
+                    var setScreenMethod = Minecraft.class.getMethod("method_1608", Class.forName("net.minecraft.class_418"));
+                    setScreenMethod.invoke(mc, screen);
+                } catch (Exception e) {
+                    System.out.println("[SaveLogins] Chat open failed: " + e);
                 }
-            } catch (Exception e) {
-                System.out.println("[SaveLogins] Could not send command: " + e.getMessage());
-            }
+            });
         }
     }
 }
