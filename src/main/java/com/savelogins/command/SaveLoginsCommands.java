@@ -150,101 +150,73 @@ public class SaveLoginsCommands {
     }
     
     /**
-     * Direct send using official API
+     * Direct send using official API - with MORE debug to find what works
      */
     private static void sendDirect(Minecraft mc, String message) {
+        // First, log what methods ARE available in player
+        var player = mc.player;
+        if (player != null) {
+            System.out.println("[SaveLogins] Player class: " + player.getClass().getName());
+            for (java.lang.reflect.Method m : player.getClass().getMethods()) {
+                m.setAccessible(true);
+                String name = m.getName();
+                if (name.contains("send") || name.contains("chat")) {
+                    System.out.println("[SaveLogins] Player method: " + name + " (" + m.getParameterCount() + " params)");
+                }
+            }
+        }
+        
+        // Find connection and list methods
+        for (java.lang.reflect.Field f : mc.getClass().getDeclaredFields()) {
+            f.setAccessible(true);
+            try {
+                Object value = f.get(mc);
+                if (value != null) {
+                    String name = f.getName();
+                    String className = value.getClass().getSimpleName();
+                    if (name.contains("connection") || name.contains("handler")) {
+                        System.out.println("[SaveLogins] Found field: " + name + " = " + className);
+                        // List send methods
+                        for (java.lang.reflect.Method m : value.getClass().getMethods()) {
+                            m.setAccessible(true);
+                            if (m.getName().contains("send")) {
+                                System.out.println("[SaveLogins] Connection method: " + m.getName() + " (" + m.getParameterCount() + " params)");
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) { /* ignore */ }
+        }
+        
+        // Now try actual send
         try {
-            // Get ALL fields from Minecraft to find connection
-            Object connection = null;
+            // Find and call the first method that looks like it sends
             for (java.lang.reflect.Field f : mc.getClass().getDeclaredFields()) {
                 f.setAccessible(true);
                 try {
-                    Object value = f.get(mc);
-                    if (value != null) {
-                        String name = f.getName();
-                        String className = value.getClass().getSimpleName();
-                        // Look for connection/handler related to play
-                        if (name.contains("connection") || name.contains("handler") || name.contains("network")) {
-                            if (className.contains("Connection") || className.contains("Handler") || className.contains("Network")) {
-                                connection = value;
-                                System.out.println("[SaveLogins] Found connection: " + className + " via " + name);
-                                break;
+                    Object conn = f.get(mc);
+                    if (conn != null && (f.getName().contains("connection") || f.getName().contains("handler"))) {
+                        for (java.lang.reflect.Method m : conn.getClass().getMethods()) {
+                            m.setAccessible(true);
+                            if (m.getName().contains("send") && m.getParameterCount() == 1) {
+                                Class<?>[] params = m.getParameterTypes();
+                                try {
+                                    if (params[0] == String.class) {
+                                        m.invoke(conn, message);
+                                        System.out.println("[SaveLogins] SUCCESS via: " + m.getName());
+                                        return;
+                                    }
+                                } catch (Exception e) { }
                             }
                         }
                     }
-                } catch (Exception e) { /* ignore */ }
-            }
-            
-            // Method 1: Try via connection with ANY method that looks like send
-            if (connection != null) {
-                for (java.lang.reflect.Method m : connection.getClass().getMethods()) {
-                    m.setAccessible(true);
-                    String name = m.getName();
-                    int params = m.getParameterCount();
-                    // Look for any send method with 1 String or Object param
-                    if (name.contains("send") && params == 1) {
-                        Class<?>[] paramTypes = m.getParameterTypes();
-                        if (paramTypes[0] == String.class || paramTypes[0] == Object.class) {
-                            try {
-                                m.invoke(connection, message);
-                                System.out.println("[SaveLogins] Sent via " + name + ": " + message);
-                                return;
-                            } catch (Exception e) {
-                                // Try next
-                            }
-                        }
-                        // Also try methods with 2 params
-                        if (name.contains("send") && params == 2) {
-                            try {
-                                m.invoke(connection, message, null);
-                                System.out.println("[SaveLogins] Sent via " + name + ": " + message);
-                                return;
-                            } catch (Exception e) {
-                                // Continue
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Method 2: Try via player - check ALL methods
-            var player = mc.player;
-            if (player != null) {
-                for (java.lang.reflect.Method m : player.getClass().getMethods()) {
-                    m.setAccessible(true);
-                    String name = m.getName();
-                    int params = m.getParameterCount();
-                    
-                    // Try ANY method that could send chat
-                    if ((name.contains("send") || name.contains("chat")) && params == 1) {
-                        try {
-                            m.invoke(player, message);
-                            System.out.println("[SaveLogins] Sent via player." + name + ": " + message);
-                            return;
-                        } catch (Exception e) { /* continue */ }
-                    }
-                }
-            }
-            
-            // Method 3: Just try the first send method we find
-            if (connection != null) {
-                for (java.lang.reflect.Method m : connection.getClass().getMethods()) {
-                    m.setAccessible(true);
-                    if (m.getName().startsWith("send") && m.getParameterCount() == 1) {
-                        try {
-                            m.invoke(connection, message);
-                            System.out.println("[SaveLogins] Sent via " + m.getName());
-                            return;
-                        } catch (Exception e) { /* continue */ }
-                    }
-                }
+                } catch (Exception e) { }
             }
             
             System.out.println("[SaveLogins] Could not send: " + message);
             
         } catch (Exception e) {
             System.out.println("[SaveLogins] Error: " + e.getMessage());
-            e.printStackTrace();
         }
     }
     
