@@ -3,6 +3,9 @@
 build/
 gradle/
 
+# But keep gradle wrapper
+!gradle/wrapper/
+
 # IDE
 .idea/
 *.iml
