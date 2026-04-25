@@ -2,14 +2,14 @@ package com.savelogins.command;
 
 import com.savelogins.StorageManager;
 import com.savelogins.ServerTracker;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 
 /**
- * Client-side commands that work on ANY server (vanilla compatible).
- * Opens chat with command pre-filled - user just presses Enter.
+ * Client-side commands for SaveLogins mod.
  */
 public class SaveLoginsCommands {
 
@@ -28,11 +28,10 @@ public class SaveLoginsCommands {
                     .executes(context -> handleLogin(storage, serverTracker, context.getSource()))
             );
             
-            // /aregister <password>
+            // /aregister <password> - using string() for password
             dispatcher.register(
                 net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("aregister")
-                    .then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("password", 
-                        com.mojang.brigadier.arguments.StringArgumentType.greedyString())
+                    .then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("password", StringArgumentType.string())
                         .executes(context -> handleRegister(storage, serverTracker, context))
                     )
             );
@@ -40,8 +39,7 @@ public class SaveLoginsCommands {
             // /ar - alias
             dispatcher.register(
                 net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("ar")
-                    .then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("password", 
-                        com.mojang.brigadier.arguments.StringArgumentType.greedyString())
+                    .then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("password", StringArgumentType.string())
                         .executes(context -> handleRegister(storage, serverTracker, context))
                     )
             );

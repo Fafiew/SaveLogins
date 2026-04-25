@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "savelogins",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "name": "SaveLogins",
   "description": "A client-side password manager for Minecraft multiplayer servers",
   "authors": [
