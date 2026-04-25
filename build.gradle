@@ -7,7 +7,7 @@ buildscript {
         gradlePluginPortal()
     }
     dependencies {
-        classpath "net.fabricmc:fabric-loom:1.2.6"
+        classpath "net.fabricmc:fabric-loom:1.16.1"
     }
 }
 
@@ -41,7 +41,7 @@ dependencies {
     modImplementation("net.fabricmc.fabric-api:fabric-api:${fabricVersion}")
 
     // Fabric Loader
-    implementation("net.fabricmc:fabric-loader:${fabricLoaderVersion}")
+    modImplementation("net.fabricmc:fabric-loader:${fabricLoaderVersion}")
 
     // Minecraft
     minecraft("com.mojang:minecraft:${minecraftVersion}")
@@ -51,8 +51,12 @@ dependencies {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
 }
 
 tasks.named('compileJava') {

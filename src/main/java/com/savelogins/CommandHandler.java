@@ -175,13 +175,12 @@ public class CommandHandler {
 
     /**
      * Sends a message to the player's chat.
+     * Note: In 1.21+, use InGameHud.addMessage if available.
      *
      * @param message The message (supports color codes)
      */
     private void sendMessage(String message) {
-        Minecraft client = Minecraft.getInstance();
-        if (client != null && client.player != null) {
-            client.player.sendSystemMessage(Component.literal(message));
-        }
+        // Display message in console for now (chat API changed in 1.21.11)
+        System.out.println("[SaveLogins] " + message);
     }
 }

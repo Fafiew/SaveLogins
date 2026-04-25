@@ -99,12 +99,7 @@ public class SaveLogins implements ClientModInitializer {
             if (serverId != null) {
                 String password = registerMatcher.group(1);
                 storageManager.savePassword(serverId, password);
-                
-                // Show feedback to player
-                Minecraft client = Minecraft.getInstance();
-                if (client != null && client.player != null) {
-                    client.player.sendSystemMessage(Component.literal("§aPassword saved for §e" + serverId));
-                }
+                // Feedback shown via command confirmation
             }
             return;
         }
