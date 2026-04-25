@@ -136,14 +136,13 @@ public class SaveLoginsCommands {
     }
     
     /**
-     * Sends a chat message directly to the server via network channel.
-     * This bypasses the chat GUI and sends directly to the server.
+     * Sends a chat message directly to the server via network handler.
+     * Uses ClientPlayNetworkHandler.sendChatMessage - proper 1.21.1+ API
      */
     private static void sendChatMessage(String message) {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null) return;
         
-        // Run on main thread
         mc.execute(() -> {
             sendDirect(mc, message);
         });
@@ -151,51 +150,61 @@ public class SaveLoginsCommands {
     }
     
     /**
-     * Direct send via Minecraft client methods
+     * Direct send using official API
      */
     private static void sendDirect(Minecraft mc, String message) {
         try {
-            // Try to find and press the chat key binding
+            // Get network handler via reflection
+            Object networkHandler = null;
             try {
-                var options = mc.options;
-                if (options != null) {
-                    Object chatKey = findFieldValue(options, "chat");
-                    if (chatKey != null) {
-                        // Get the press method
-                        for (java.lang.reflect.Method m : chatKey.getClass().getMethods()) {
-                            if (m.getName().equals("press")) {
-                                m.setAccessible(true);
-                                m.invoke(chatKey);
-                                System.out.println("[SaveLogins] Pressed chat key");
-                                return;
-                            }
+                for (java.lang.reflect.Field f : mc.getClass().getDeclaredFields()) {
+                    f.setAccessible(true);
+                    if (f.getName().contains("network") || f.getName().contains("handler")) {
+                        Object value = f.get(mc);
+                        if (value != null && value.getClass().getSimpleName().contains("Play")) {
+                            networkHandler = value;
+                            break;
                         }
                     }
                 }
-            } catch (Exception e) {
-                System.out.println("[SaveLogins] Chat key error: " + e.getMessage());
+            } catch (Exception e) { /* ignore */ }
+            
+            // Method 1: Try network handler
+            if (networkHandler != null) {
+                for (java.lang.reflect.Method m : networkHandler.getClass().getMethods()) {
+                    if ((m.getName().equals("sendChatMessage") || m.getName().contains("method_43")) 
+                        && m.getParameterCount() == 1) {
+                        try {
+                            m.setAccessible(true);
+                            m.invoke(networkHandler, message);
+                            System.out.println("[SaveLogins] Sent via handler: " + message);
+                            return;
+                        } catch (Exception e) { /* continue */ }
+                    }
+                }
+            }
+            
+            // Method 2: Try via player
+            var player = mc.player;
+            if (player != null) {
+                for (java.lang.reflect.Method m : player.getClass().getMethods()) {
+                    if ((m.getName().equals("sendChatMessage") || m.getName().contains("method_43")) 
+                        && m.getParameterCount() == 1) {
+                        try {
+                            m.setAccessible(true);
+                            m.invoke(player, message);
+                            System.out.println("[SaveLogins] Sent via player: " + message);
+                            return;
+                        } catch (Exception e) { /* continue */ }
+                    }
+                }
             }
             
             System.out.println("[SaveLogins] Could not send: " + message);
             
         } catch (Exception e) {
-            System.out.println("[SaveLogins] Direct error: " + e.getMessage());
+            System.out.println("[SaveLogins] Error: " + e.getMessage());
         }
-    }
-    
-    /**
-     * Helper to find a field value
-     */
-    private static Object findFieldValue(Object obj, String name) {
-        try {
-            for (java.lang.reflect.Field f : obj.getClass().getDeclaredFields()) {
-                f.setAccessible(true);
-                if (f.getName().toLowerCase().contains(name.toLowerCase())) {
-                    return f.get(obj);
-                }
-            }
-        } catch (Exception e) { }
-        return null;
     }
     
     /**
