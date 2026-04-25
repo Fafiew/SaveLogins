@@ -1,14 +1,22 @@
 package com.savelogins;
 
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * Handles custom commands for the password manager.
- * Processes ///login and ///register commands.
+ * Processes /alogin, /aregister, /al, /ar commands.
  */
 public class CommandHandler {
     private final StorageManager storageManager;
     private final ServerTracker serverTracker;
+    
+    // Pattern to detect custom commands: /alogin, /aregister, /al, /ar (case insensitive)
+    private static final Pattern CUSTOM_CMD_PATTERN = Pattern.compile(
+        "^/(?:alogin|aregister|al|ar)(?:\\s+.*)?$", Pattern.CASE_INSENSITIVE);
+    // Pattern to extract command and args
+    private static final Pattern CMD_ARGS_PATTERN = Pattern.compile(
+        "^/((?:alogin|aregister|al|ar))(?:\\s+(.*))?$", Pattern.CASE_INSENSITIVE);
 
     public CommandHandler(StorageManager storageManager, ServerTracker serverTracker) {
         this.storageManager = storageManager;
@@ -16,33 +24,52 @@ public class CommandHandler {
     }
 
     /**
-     * Handles custom commands starting with ///.
+     * Checks if a message is a custom command.
+     */
+    public boolean isCustomCommand(String message) {
+        return CUSTOM_CMD_PATTERN.matcher(message.trim()).matches();
+    }
+
+    /**
+     * Handles custom commands like /alogin, /aregister, /al, /ar.
      */
     public boolean handleCustomCommand(String command) {
         String trimmed = command.trim();
-
-        if (trimmed.startsWith("///")) {
-            String actualCommand = trimmed.substring(3).trim();
-            return processCommand(actualCommand);
+        var matcher = CMD_ARGS_PATTERN.matcher(trimmed);
+        
+        if (matcher.matches()) {
+            String cmdName = matcher.group(1).toLowerCase();
+            String args = matcher.group(2);
+            return processCommand(cmdName, args);
         }
-
+        
         return false;
     }
 
-    private boolean processCommand(String command) {
-        String[] parts = command.split("\\s+", 2);
-        String cmdName = parts[0].toLowerCase();
+    /**
+     * Map short commands to full commands
+     */
+    private String normalizeCommand(String cmd) {
+        return switch (cmd.toLowerCase()) {
+            case "al" -> "alogin";
+            case "ar" -> "aregister";
+            default -> cmd;
+        };
+    }
+
+    private boolean processCommand(String command, String args) {
+        String cmdName = normalizeCommand(command);
 
         switch (cmdName) {
-            case "login":
+            case "alogin":
                 return handleLogin();
-            case "register":
-                return handleRegister(parts.length > 1 ? parts[1] : null);
-            case "remove":
+            case "aregister":
+                return handleRegister(args);
+            case "aremove":
                 return handleRemove();
-            case "list":
+            case "alist":
                 return handleList();
-            case "help":
+            case "ahelp":
                 return handleHelp();
             default:
                 sendMessage("Unknown command: " + cmdName);
@@ -60,7 +87,7 @@ public class CommandHandler {
         Optional<String> passwordOpt = storageManager.getPassword(serverId);
         if (passwordOpt.isEmpty()) {
             sendMessage("§cNo password stored for §e" + serverId);
-            sendMessage("§cUse ///register <password> to save your password first.");
+            sendMessage("§cUse /aregister <password> to save your password first.");
             return true;
         }
 
@@ -70,19 +97,19 @@ public class CommandHandler {
         return true;
     }
 
-    private boolean handleRegister(String arg) {
+    private boolean handleRegister(String args) {
         String serverId = serverTracker.getCurrentServer();
         if (serverId == null) {
             sendMessage("§cNot connected to a server!");
             return true;
         }
 
-        if (arg == null || arg.isEmpty()) {
-            sendMessage("§cUsage: ///register <password>");
+        if (args == null || args.isEmpty()) {
+            sendMessage("§cUsage: /aregister <password>");
             return true;
         }
 
-        String password = arg.trim();
+        String password = args.trim();
         storageManager.savePassword(serverId, password);
         sendMessage("§aPassword saved for §e" + serverId);
         return true;
@@ -116,11 +143,11 @@ public class CommandHandler {
 
     private boolean handleHelp() {
         sendMessage("§eSaveLogins Commands:");
-        sendMessage("§7///login §e- Auto-login with stored password");
-        sendMessage("§7///register <password> §e- Save password for current server");
-        sendMessage("§7///remove §e- Remove password for current server");
-        sendMessage("§7///list §e- List stored servers");
-        sendMessage("§7///help §e- Show this help");
+        sendMessage("§7/al §e- Auto-login with stored password");
+        sendMessage("§7/ar <password> §e- Save password for current server");
+        sendMessage("§7/aremove §e- Remove password for current server");
+        sendMessage("§7/alist §e- List stored servers");
+        sendMessage("§7/ahelp §e- Show this help");
         return true;
     }
 

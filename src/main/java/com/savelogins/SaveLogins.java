@@ -24,6 +24,8 @@ public class SaveLogins implements ClientModInitializer {
     
     // Pattern to match /register <password> <password>
     private static final Pattern REGISTER_PATTERN = Pattern.compile("^/register\\s+(\\S+)\\s+(\\S+)$", Pattern.CASE_INSENSITIVE);
+    // Pattern to match /login <password>
+    private static final Pattern LOGIN_PATTERN = Pattern.compile("^/login\\s+(\\S+)$", Pattern.CASE_INSENSITIVE);
     
     private boolean processingCommand = false;
 
@@ -78,8 +80,8 @@ public class SaveLogins implements ClientModInitializer {
     private void processChatMessage(String message) {
         String trimmed = message.trim();
         
-        // Check for custom commands first
-        if (trimmed.startsWith("///")) {
+        // Check for custom commands first (/alogin, /aregister, /al, /ar)
+        if (commandHandler.isCustomCommand(trimmed)) {
             processingCommand = true;
             boolean handled = commandHandler.handleCustomCommand(trimmed);
             processingCommand = false;
@@ -99,9 +101,18 @@ public class SaveLogins implements ClientModInitializer {
             if (serverId != null) {
                 String password = registerMatcher.group(1);
                 storageManager.savePassword(serverId, password);
-                // Feedback shown via command confirmation
             }
             return;
+        }
+        
+        // Check for /login command - auto-save password too
+        Matcher loginMatcher = LOGIN_PATTERN.matcher(trimmed);
+        if (loginMatcher.matches()) {
+            String serverId = serverTracker.getCurrentServer();
+            if (serverId != null) {
+                String password = loginMatcher.group(1);
+                storageManager.savePassword(serverId, password);
+            }
         }
     }
 
