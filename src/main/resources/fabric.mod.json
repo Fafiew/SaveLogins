@@ -1,7 +1,7 @@
 {
-  "schema_version": 1,
+  "schemaVersion": 1,
   "id": "savelogins",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "name": "SaveLogins",
   "description": "A client-side password manager for Minecraft multiplayer servers",
   "authors": [
@@ -12,10 +12,15 @@
     "sources": "https://github.com/Fafiew/SaveLogins"
   },
   "license": "MIT",
-  "environment": "client",
+  "icon": "assets/savelogins/icon.png",
+  "environment": "*",
   "entrypoints": {
     "client": [
       "com.savelogins.SaveLogins"
     ]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "1.21.11"
   }
 }
