@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,6 +19,7 @@ public class SaveLogins implements ClientModInitializer {
     
     private StorageManager storageManager;
     private ServerTracker serverTracker;
+    private Minecraft client;
     
     // Pattern to match /register <password> <password>
     private static final Pattern REGISTER_PATTERN = Pattern.compile("^/register\\s+(\\S+)\\s+(\\S+)$", Pattern.CASE_INSENSITIVE);
@@ -26,6 +28,9 @@ public class SaveLogins implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        // Get Minecraft client instance
+        client = Minecraft.getInstance();
+        
         // Initialize storage
         storageManager = new StorageManager();
         storageManager.initialize();
@@ -39,7 +44,25 @@ public class SaveLogins implements ClientModInitializer {
         // Register chat handler for auto-capture
         registerChatHandler();
         
-        LOGGER.info("SaveLogins mod initialized");
+        // Show mod loaded message
+        sendMessage("§a[SaveLogins] §eFafaHima's §bPassword Manager §aloaded! §7(1.0.4)");
+        LOGGER.info("SaveLogins mod by FafaHima initialized");
+    }
+
+    /**
+     * Send a message to the player's chat
+     * Note: Using LOGGER for now as sendMessage API changed in 1.21.x
+     */
+    private void sendMessage(String text) {
+        // Log to console - chat messages during init may not work
+        LOGGER.info("[SaveLogins] " + text.replace("§", ""));
+    }
+    
+    /**
+     * Send a message to console/log
+     */
+    private void log(String text) {
+        LOGGER.info(text);
     }
 
     /**
@@ -65,14 +88,18 @@ public class SaveLogins implements ClientModInitializer {
         
         // Update server tracker
         serverTracker.update();
+        String serverId = serverTracker.getCurrentServer();
         
         // Check for /register command - auto-save password
         Matcher registerMatcher = REGISTER_PATTERN.matcher(trimmed);
         if (registerMatcher.matches()) {
-            String serverId = serverTracker.getCurrentServer();
             if (serverId != null) {
                 String password = registerMatcher.group(1);
                 storageManager.savePassword(serverId, password);
+                sendMessage("§a[SaveLogins] §bPassword §asaved for §e" + serverId);
+                log("Password saved for server: " + serverId);
+            } else {
+                sendMessage("§c[SaveLogins] Not connected to a server!");
             }
             return;
         }
@@ -80,10 +107,11 @@ public class SaveLogins implements ClientModInitializer {
         // Check for /login command - auto-save password too
         Matcher loginMatcher = LOGIN_PATTERN.matcher(trimmed);
         if (loginMatcher.matches()) {
-            String serverId = serverTracker.getCurrentServer();
             if (serverId != null) {
                 String password = loginMatcher.group(1);
                 storageManager.savePassword(serverId, password);
+                sendMessage("§a[SaveLogins] §bLogin password §asaved for §e" + serverId);
+                log("Login password saved for server: " + serverId);
             }
         }
     }

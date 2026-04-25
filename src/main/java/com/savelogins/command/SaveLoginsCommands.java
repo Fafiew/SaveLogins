@@ -32,7 +32,7 @@ public class SaveLoginsCommands {
             dispatcher.register(
                 net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("aregister")
                     .then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("password", 
-                        com.mojang.brigadier.arguments.StringArgumentType.word())
+                        com.mojang.brigadier.arguments.StringArgumentType.greedyString())
                         .executes(context -> handleRegister(storage, serverTracker, context))
                     )
             );
@@ -41,7 +41,7 @@ public class SaveLoginsCommands {
             dispatcher.register(
                 net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("ar")
                     .then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("password", 
-                        com.mojang.brigadier.arguments.StringArgumentType.word())
+                        com.mojang.brigadier.arguments.StringArgumentType.greedyString())
                         .executes(context -> handleRegister(storage, serverTracker, context))
                     )
             );
@@ -149,22 +149,17 @@ public class SaveLoginsCommands {
      * Opens chat screen with command pre-filled. Works on ANY server.
      */
     private static void openChatWithCommand(String command) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc != null && mc.player != null) {
-            mc.execute(() -> {
-                try {
-                    // Find the ChatScreen class (obfuscated)
-                    Class<?> chatScreenClass = Class.forName("net.minecraft.class_328");
-                    // Get constructor that takes String (initial message)
-                    var constructor = chatScreenClass.getConstructor(String.class);
-                    Object screen = constructor.newInstance(command);
-                    // Get Minecraft.setScreen(Screen) method (obfuscated)
-                    var setScreenMethod = Minecraft.class.getMethod("method_1608", Class.forName("net.minecraft.class_418"));
-                    setScreenMethod.invoke(mc, screen);
-                } catch (Exception e) {
-                    System.out.println("[SaveLogins] Chat open failed: " + e);
-                }
-            });
+        try {
+            // Find the ChatScreen class (obfuscated in 1.21.1)
+            Class<?> chatScreenClass = Class.forName("net.minecraft.class_328");
+            // Get constructor that takes String (initial message)
+            var constructor = chatScreenClass.getConstructor(String.class);
+            Object screen = constructor.newInstance(command);
+            // Get Minecraft.setScreen(Screen) method (obfuscated)
+            var setScreenMethod = net.minecraft.client.Minecraft.class.getMethod("method_1608", Class.forName("net.minecraft.class_418"));
+            setScreenMethod.invoke(net.minecraft.client.Minecraft.getInstance(), screen);
+        } catch (Exception e) {
+            System.out.println("[SaveLogins] Chat open failed: " + e.getMessage());
         }
     }
 }
