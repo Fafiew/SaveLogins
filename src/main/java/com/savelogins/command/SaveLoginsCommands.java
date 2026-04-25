@@ -269,21 +269,45 @@ public class SaveLoginsCommands {
     }
     
     /**
-     * Opens chat with command pre-filled
+     * Opens chat with command pre-filled - simpler reliable approach
      */
     private static void openChatWithCommand(String command) {
         try {
             Minecraft mc = Minecraft.getInstance();
             if (mc == null) return;
             
-            Class<?> chatScreenClass = Class.forName("net.minecraft.class_328");
-            var constructor = chatScreenClass.getConstructor(String.class);
-            Object screen = constructor.newInstance(command);
-            var setScreenMethod = net.minecraft.client.Minecraft.class.getMethod("method_1608", 
-                Class.forName("net.minecraft.class_418"));
-            setScreenMethod.invoke(mc, screen);
+            // Execute on game thread
+            mc.execute(() -> {
+                try {
+                    // Simpler: try to get current screen, if exists try to add input
+                    var currentScreen = mc.screen;
+                    
+                    // Use direct setScreen approach with obfuscated name found in mappings
+                    // In 1.21.1 the ChatScreen class has been obfuscated - let's look at proper mapping
+                    // Try method_1608 is the setScreen method, param is net.minecraft.class_418 (Screen)
+                    
+                    // Build argument array for constructor - chatText field
+                    // The ChatScreen constructor takes String - so just use it directly
+                    
+                    // Try direct with the exact mappings from 1.21.1
+                    Class<?> screenClass = Class.forName("net.minecraft.class_328"); // ChatScreen
+                    java.lang.reflect.Constructor<?> ctor = screenClass.getConstructor(String.class);
+                    
+                    Object chatScreen = ctor.newInstance(command);
+                    
+                    // Now call setScreen - method_1608 is the method ID for setScreen
+                    java.lang.reflect.Method setScreen = net.minecraft.client.Minecraft.class.getDeclaredMethod("method_1608", 
+                        Class.forName("net.minecraft.class_418"));
+                    setScreen.setAccessible(true);
+                    setScreen.invoke(mc, chatScreen);
+                    
+                } catch (Exception e) {
+                    System.out.println("[SaveLogins] Chat open error: " + e);
+                }
+            });
+            
         } catch (Exception e) {
-            System.out.println("[SaveLogins] Chat open failed: " + e.getMessage());
+            System.out.println("[SaveLogins] Chat open failed: " + e);
         }
     }
 }
