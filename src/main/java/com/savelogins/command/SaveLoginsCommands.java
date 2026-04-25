@@ -80,10 +80,10 @@ public class SaveLoginsCommands {
         
         String password = passwordOpt.get();
         
-        // Open chat with /login command pre-filled - works on ANY server
-        openChatWithCommand("/login " + password);
+        // Send /login directly to server
+        sendCommandToServer("/login " + password);
         
-        source.sendFeedback(Component.literal("§aLogging in to §e" + serverId + "§a... §7(Press Enter)"));
+        source.sendFeedback(Component.literal("§aLogging in to §e" + serverId + "§a..."));
         return 1;
     }
     
@@ -100,11 +100,10 @@ public class SaveLoginsCommands {
         // Save password
         storage.savePassword(serverId, password);
         
-        // Also send /register to server
-        openChatWithCommand("/register " + password + " " + password);
+        // Send /register directly to server
+        sendCommandToServer("/register " + password + " " + password);
         
-        context.getSource().sendFeedback(Component.literal("§aPassword saved for §e" + serverId));
-        context.getSource().sendFeedback(Component.literal("§7Sending /register... §7(Press Enter)"));
+        context.getSource().sendFeedback(Component.literal("§aPassword saved and sent to §e" + serverId));
         return 1;
     }
     
@@ -141,6 +140,59 @@ public class SaveLoginsCommands {
         source.sendFeedback(Component.literal("§7/aremove §e- Delete password"));
         source.sendFeedback(Component.literal("§7/alist §e- List servers"));
         return 1;
+    }
+    
+    /**
+     * Sends a chat message directly to the server. Works on ANY server.
+     */
+    private static void sendCommandToServer(String command) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc == null) return;
+            
+            // Get the connection handler
+            Object connection = null;
+            java.lang.reflect.Field[] fields = mc.getClass().getDeclaredFields();
+            for (java.lang.reflect.Field field : fields) {
+                field.setAccessible(true);
+                Object value = field.get(mc);
+                // Check for play handler
+                String name = field.getName();
+                if (name.contains("connection") || name.contains("handler")) {
+                    if (value != null && value.getClass().getSimpleName().contains("ClientPlayNetHandler")) {
+                        connection = value;
+                        break;
+                    }
+                }
+            }
+            
+            if (connection == null) {
+                // Fallback - use chat screen
+                openChatWithCommand(command);
+                return;
+            }
+            
+            // Find the sendChatMessage method
+            java.lang.reflect.Method[] methods = connection.getClass().getDeclaredMethods();
+            for (java.lang.reflect.Method method : methods) {
+                method.setAccessible(true);
+                if (method.getName().contains("sendChatMessage") || method.getName().equals("a")) {
+                    // Try to call it
+                    try {
+                        method.invoke(connection, command);
+                        return;
+                    } catch (Exception e) {
+                        // Try next method
+                    }
+                }
+            }
+            
+            // Fallback to chat screen
+            openChatWithCommand(command);
+        } catch (Exception e) {
+            // Fallback to chat screen
+            openChatWithCommand(command);
+        }
     }
     
     /**
