@@ -80,10 +80,10 @@ public class SaveLoginsCommands {
         
         String password = passwordOpt.get();
         
-        // Send /login directly to server
-        sendCommandToServer("/login " + password);
+        // Open chat field with /login command so user just presses enter
+        openChatWithCommand("/login " + password);
         
-        source.sendFeedback(Component.literal("§aLogging in to §e" + serverId + "§a..."));
+        source.sendFeedback(Component.literal("§aLogging in to §e" + serverId + "§a... §7(Press Enter)"));
         return 1;
     }
     
@@ -100,10 +100,12 @@ public class SaveLoginsCommands {
         // Save password
         storage.savePassword(serverId, password);
         
-        // Send /register directly to server
-        sendCommandToServer("/register " + password + " " + password);
+        // Open chat field with /register command
+        openChatWithCommand("/register " + password + " " + password);
         
-        context.getSource().sendFeedback(Component.literal("§aPassword saved and sent to §e" + serverId));
+        context.getSource().sendFeedback(Component.literal("§aPassword saved for §e" + serverId));
+        context.getSource().sendFeedback(Component.literal("§7Type §e/register§r§7 then press Enter"));
+
         return 1;
     }
     
@@ -143,73 +145,59 @@ public class SaveLoginsCommands {
     }
     
     /**
-     * Sends a chat message directly to the server. Works on ANY server.
+     * Opens chat with command pre-filled and focuses it. 
+     * Uses a reliable approach that works on most servers.
      */
-    private static void sendCommandToServer(String command) {
+    private static void openChatWithCommand(String command) {
         try {
             Minecraft mc = Minecraft.getInstance();
             if (mc == null) return;
             
-            // Get the connection handler
-            Object connection = null;
-            java.lang.reflect.Field[] fields = mc.getClass().getDeclaredFields();
-            for (java.lang.reflect.Field field : fields) {
-                field.setAccessible(true);
-                Object value = field.get(mc);
-                // Check for play handler
-                String name = field.getName();
-                if (name.contains("connection") || name.contains("handler")) {
-                    if (value != null && value.getClass().getSimpleName().contains("ClientPlayNetHandler")) {
-                        connection = value;
-                        break;
-                    }
-                }
-            }
+            // Method 1: Open ChatScreen with text
+            Class<?> chatScreenClass = Class.forName("net.minecraft.class_328");
+            var constructor = chatScreenClass.getConstructor(String.class);
+            Object screen = constructor.newInstance(command);
+            var setScreenMethod = net.minecraft.client.Minecraft.class.getMethod("method_1608", 
+                Class.forName("net.minecraft.class_418"));
+            setScreenMethod.invoke(mc, screen);
             
-            if (connection == null) {
-                // Fallback - use chat screen
-                openChatWithCommand(command);
-                return;
-            }
-            
-            // Find the sendChatMessage method
-            java.lang.reflect.Method[] methods = connection.getClass().getDeclaredMethods();
-            for (java.lang.reflect.Method method : methods) {
-                method.setAccessible(true);
-                if (method.getName().contains("sendChatMessage") || method.getName().equals("a")) {
-                    // Try to call it
-                    try {
-                        method.invoke(connection, command);
-                        return;
-                    } catch (Exception e) {
-                        // Try next method
-                    }
-                }
-            }
-            
-            // Fallback to chat screen
-            openChatWithCommand(command);
+            // Try to press Enter automatically after a short delay using scheduled callback
+            // But for now just show the chat with text
         } catch (Exception e) {
-            // Fallback to chat screen
-            openChatWithCommand(command);
+            System.out.println("[SaveLogins] Chat open failed: " + e.getMessage());
         }
     }
     
     /**
-     * Opens chat screen with command pre-filled. Works on ANY server.
+     * Alt method: Use Keyboard and screen to send chat
      */
-    private static void openChatWithCommand(String command) {
+    private static void sendChatDirect(String message) {
         try {
-            // Find the ChatScreen class (obfuscated in 1.21.1)
-            Class<?> chatScreenClass = Class.forName("net.minecraft.class_328");
-            // Get constructor that takes String (initial message)
-            var constructor = chatScreenClass.getConstructor(String.class);
-            Object screen = constructor.newInstance(command);
-            // Get Minecraft.setScreen(Screen) method (obfuscated)
-            var setScreenMethod = net.minecraft.client.Minecraft.class.getMethod("method_1608", Class.forName("net.minecraft.class_418"));
-            setScreenMethod.invoke(net.minecraft.client.Minecraft.getInstance(), screen);
+            Minecraft mc = Minecraft.getInstance();
+            if (mc == null || mc.player == null) return;
+            
+            // Use player .sendChat() method which sends to server
+            // Try using reflection on the player object
+            var player = mc.player;
+            
+            // Find sendChat or a method to send message
+            for (java.lang.reflect.Method m : player.getClass().getDeclaredMethods()) {
+                m.setAccessible(true);
+                String name = m.getName();
+                // Look for chat sending method
+                if (name.contains("sendChat") || name.equals("method_4324")) {
+                    try {
+                        if (name.contains("String")) {
+                            m.invoke(player, message);
+                            return;
+                        }
+                    } catch (Exception e) {
+                        // Continue trying
+                    }
+                }
+            }
         } catch (Exception e) {
-            System.out.println("[SaveLogins] Chat open failed: " + e.getMessage());
+            System.out.println("[SaveLogins] Direct send failed: " + e.getMessage());
         }
     }
 }
