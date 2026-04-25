@@ -147,63 +147,77 @@ public class SaveLoginsCommands {
         mc.execute(() -> {
             sendDirect(mc, message);
         });
-        System.out.println("[SaveLogins] Message queued: " + message);
+        System.out.println("[SaveLogins] Trying to send: " + message);
     }
     
     /**
-     * Direct send via network connection
+     * Direct send via Minecraft client methods
      */
     private static void sendDirect(Minecraft mc, String message) {
         try {
-            // Get the network connection
-            Connection connection = getConnection(mc);
+            // Method 1: Use MinecraftClient.openChatScreen - this opens chat with message pre-filled
+            // This is the official API in 1.21+
+            try {
+                // Find openChatScreen method
+                for (java.lang.reflect.Method m : mc.getClass().getMethods()) {
+                    if (m.getName().equals("openChatScreen") && m.getParameterCount() == 1) {
+                        m.setAccessible(true);
+                        // Pass the message - this should open chat with it ready
+                        m.invoke(mc, message);
+                        System.out.println("[SaveLogins] Opened chat with: " + message);
+                        return;
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("[SaveLogins] ChatScreen error: " + e.getMessage());
+            }
             
-            if (connection != null) {
-                // Use the send method
-                // In 1.21+ the method is send() with ChatMessage encoded
-                try {
-                    // Try direct send method
-                    for (Method m : connection.getClass().getMethods()) {
-                        if (m.getName().contains("send") && m.getParameterCount() >= 1) {
+            // Method 2: Try using SignedMessage API (1.21+)
+            try {
+                var player = mc.player;
+                if (player != null) {
+                    // Try creating a SignedMessage and sending it
+                    // In 1.21, there's SentMessage.Chat which wraps chat messages
+                    Class<?> sentMessageClass = null;
+                    try {
+                        sentMessageClass = Class.forName("net.minecraft.network.message.SentMessage");
+                    } catch (Exception e) {
+                        // Try alternative
+                    }
+                    
+                    if (sentMessageClass != null) {
+                        // Try to create and send
+                        for (java.lang.reflect.Method m : sentMessageClass.getMethods()) {
+                            if (m.getName().contains("chat") && m.getParameterCount() >= 0) {
+                                // Try creating the message
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("[SaveLogins] SignedMessage error: " + e.getMessage());
+            }
+            
+            // Method 3: Try player.sendChat() - from Fabric discussion
+            try {
+                var player = mc.player;
+                if (player != null) {
+                    for (java.lang.reflect.Method m : player.getClass().getDeclaredMethods()) {
+                        m.setAccessible(true);
+                        String name = m.getName();
+                        if ((name.equals("sendChat") || name.contains("method_43")) && m.getParameterCount() == 1) {
                             try {
-                                m.setAccessible(true);
-                                // Try with String
-                                try {
-                                    m.invoke(connection, message);
-                                    System.out.println("[SaveLogins] Sent: " + message);
-                                    return;
-                                } catch (Exception e) {
-                                    // Try next
-                                }
+                                m.invoke(player, message);
+                                System.out.println("[SaveLogins] Sent via player.sendChat");
+                                return;
                             } catch (Exception e) {
                                 // Continue
                             }
                         }
                     }
-                } catch (Exception e) {
-                    System.out.println("[SaveLogins] Send error: " + e.getMessage());
                 }
-            }
-            
-            // Fallback: try with player
-            if (mc.player != null) {
-                try {
-                    for (Method m : mc.player.getClass().getMethods()) {
-                        m.setAccessible(true);
-                        if ((m.getName().contains("sendChat") || m.getName().contains("method_4324"))
-                            && m.getParameterCount() == 1) {
-                            try {
-                                m.invoke(mc.player, message);
-                                System.out.println("[SaveLogins] Sent via player");
-                                return;
-                            } catch (Exception e) {
-                                // continue
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    System.out.println("[SaveLogins] Player error: " + e.getMessage());
-                }
+            } catch (Exception e) {
+                System.out.println("[SaveLogins] Player send error: " + e.getMessage());
             }
             
             System.out.println("[SaveLogins] Could not send: " + message);
