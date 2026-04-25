@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,23 +15,17 @@ import java.util.regex.Pattern;
  */
 public class SaveLogins implements ClientModInitializer {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static SaveLogins instance;
     
     private StorageManager storageManager;
     private ServerTracker serverTracker;
-    private CommandHandler commandHandler;
     
     // Pattern to match /register <password> <password>
     private static final Pattern REGISTER_PATTERN = Pattern.compile("^/register\\s+(\\S+)\\s+(\\S+)$", Pattern.CASE_INSENSITIVE);
     // Pattern to match /login <password>
     private static final Pattern LOGIN_PATTERN = Pattern.compile("^/login\\s+(\\S+)$", Pattern.CASE_INSENSITIVE);
-    
-    private boolean processingCommand = false;
 
     @Override
     public void onInitializeClient() {
-        instance = this;
-        
         // Initialize storage
         storageManager = new StorageManager();
         storageManager.initialize();
@@ -40,56 +33,35 @@ public class SaveLogins implements ClientModInitializer {
         // Initialize server tracker
         serverTracker = new ServerTracker();
         
-        // Initialize command handler
-        commandHandler = new CommandHandler(storageManager, serverTracker);
+        // Register client-side commands
+        com.savelogins.command.SaveLoginsCommands.register(storageManager, serverTracker);
         
-        // Register for chat message events
+        // Register chat handler for auto-capture
         registerChatHandler();
         
         LOGGER.info("SaveLogins mod initialized");
     }
 
     /**
-     * Registers the chat message handler.
+     * Registers the chat message handler for auto-capturing passwords.
      */
     private void registerChatHandler() {
-        // Register for chat message events - single String parameter
+        // Register for chat message events
         ClientSendMessageEvents.CHAT.register((message) -> {
-            if (processingCommand) {
-                return;
-            }
-            
             processChatMessage(message);
         });
         
         // Also register for command events
         ClientSendMessageEvents.COMMAND.register((message) -> {
-            if (processingCommand) {
-                return;
-            }
-            
             processChatMessage("/" + message);
         });
     }
 
     /**
-     * Processes an outgoing chat message.
-     *
-     * @param message The chat message
+     * Processes an outgoing chat message to auto-capture passwords.
      */
     private void processChatMessage(String message) {
         String trimmed = message.trim();
-        
-        // Check for custom commands first (/alogin, /aregister, /al, /ar)
-        if (commandHandler.isCustomCommand(trimmed)) {
-            processingCommand = true;
-            boolean handled = commandHandler.handleCustomCommand(trimmed);
-            processingCommand = false;
-            
-            if (handled) {
-                return;
-            }
-        }
         
         // Update server tracker
         serverTracker.update();
@@ -118,8 +90,6 @@ public class SaveLogins implements ClientModInitializer {
 
     /**
      * Gets the storage manager instance.
-     *
-     * @return The storage manager
      */
     public StorageManager getStorageManager() {
         return storageManager;
@@ -127,8 +97,6 @@ public class SaveLogins implements ClientModInitializer {
 
     /**
      * Gets the server tracker instance.
-     *
-     * @return The server tracker
      */
     public ServerTracker getServerTracker() {
         return serverTracker;
