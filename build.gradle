@@ -1,0 +1,60 @@
+buildscript {
+    repositories {
+        maven {
+            name = "Fabric"
+            url = "https://maven.fabricmc.net/"
+        }
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath "net.fabricmc:fabric-loom:1.2.6"
+    }
+}
+
+plugins {
+    id 'java'
+}
+
+apply plugin: 'fabric-loom'
+
+version = mod_version
+group = mod_group
+
+repositories {
+    mavenCentral()
+    maven {
+        name = "Fabric"
+        url = "https://maven.fabricmc.net/"
+    }
+    gradlePluginPortal()
+}
+
+def minecraftVersion = project.property('minecraft_version')
+def fabricLoaderVersion = project.property('fabric_loader_version')
+def fabricVersion = project.property('fabric_version')
+
+dependencies {
+    // Use official Mojang mappings
+    mappings(loom.officialMojangMappings())
+    
+    // Fabric API
+    modImplementation("net.fabricmc.fabric-api:fabric-api:${fabricVersion}")
+
+    // Fabric Loader
+    implementation("net.fabricmc:fabric-loader:${fabricLoaderVersion}")
+
+    // Minecraft
+    minecraft("com.mojang:minecraft:${minecraftVersion}")
+    
+    // Gson for JSON storage
+    implementation("com.google.code.gson:gson:2.10.1")
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.named('compileJava') {
+    options.encoding = 'UTF-8'
+}
