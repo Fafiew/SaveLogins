@@ -1,7 +1,5 @@
 package com.savelogins;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
 import java.util.Optional;
 
 /**
@@ -19,9 +17,6 @@ public class CommandHandler {
 
     /**
      * Handles custom commands starting with ///.
-     *
-     * @param command The full command string
-     * @return true if the command was handled by this handler
      */
     public boolean handleCustomCommand(String command) {
         String trimmed = command.trim();
@@ -34,12 +29,6 @@ public class CommandHandler {
         return false;
     }
 
-    /**
-     * Processes the custom command.
-     *
-     * @param command The command without /// prefix
-     * @return true if handled
-     */
     private boolean processCommand(String command) {
         String[] parts = command.split("\\s+", 2);
         String cmdName = parts[0].toLowerCase();
@@ -61,11 +50,6 @@ public class CommandHandler {
         }
     }
 
-    /**
-     * Handles the ///login command - auto-login with stored password.
-     *
-     * @return true if handled
-     */
     private boolean handleLogin() {
         String serverId = serverTracker.getCurrentServer();
         if (serverId == null) {
@@ -81,17 +65,11 @@ public class CommandHandler {
         }
 
         String password = passwordOpt.get();
-        sendChatCommand("/login " + password);
+        com.savelogins.mixin.ChatInvoker.sendChat("/login " + password);
         sendMessage("§aLogging in to §e" + serverId + "§a...");
         return true;
     }
 
-    /**
-     * Handles the ///register command - manually save a password.
-     *
-     * @param arg The password argument
-     * @return true if handled
-     */
     private boolean handleRegister(String arg) {
         String serverId = serverTracker.getCurrentServer();
         if (serverId == null) {
@@ -110,11 +88,6 @@ public class CommandHandler {
         return true;
     }
 
-    /**
-     * Handles the ///remove command - remove stored password.
-     *
-     * @return true if handled
-     */
     private boolean handleRemove() {
         String serverId = serverTracker.getCurrentServer();
         if (serverId == null) {
@@ -127,11 +100,6 @@ public class CommandHandler {
         return true;
     }
 
-    /**
-     * Handles the ///list command - list stored servers.
-     *
-     * @return true if handled
-     */
     private boolean handleList() {
         var servers = storageManager.getStoredServers();
         if (servers.isEmpty()) {
@@ -146,11 +114,6 @@ public class CommandHandler {
         return true;
     }
 
-    /**
-     * Handles the ///help command.
-     *
-     * @return true if handled
-     */
     private boolean handleHelp() {
         sendMessage("§eSaveLogins Commands:");
         sendMessage("§7///login §e- Auto-login with stored password");
@@ -161,26 +124,7 @@ public class CommandHandler {
         return true;
     }
 
-    /**
-     * Sends a chat message to the server.
-     *
-     * @param message The message to send
-     */
-    private void sendChatCommand(String command) {
-        Minecraft client = Minecraft.getInstance();
-        if (client != null && client.player != null && client.player.connection != null) {
-            client.player.connection.sendChat(command);
-        }
-    }
-
-    /**
-     * Sends a message to the player's chat.
-     * Note: In 1.21+, use InGameHud.addMessage if available.
-     *
-     * @param message The message (supports color codes)
-     */
     private void sendMessage(String message) {
-        // Display message in console for now (chat API changed in 1.21.11)
         System.out.println("[SaveLogins] " + message);
     }
 }
