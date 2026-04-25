@@ -154,46 +154,86 @@ public class SaveLoginsCommands {
      */
     private static void sendDirect(Minecraft mc, String message) {
         try {
-            // Get network handler via reflection
-            Object networkHandler = null;
-            try {
-                for (java.lang.reflect.Field f : mc.getClass().getDeclaredFields()) {
-                    f.setAccessible(true);
-                    if (f.getName().contains("network") || f.getName().contains("handler")) {
-                        Object value = f.get(mc);
-                        if (value != null && value.getClass().getSimpleName().contains("Play")) {
-                            networkHandler = value;
-                            break;
+            // Get ALL fields from Minecraft to find connection
+            Object connection = null;
+            for (java.lang.reflect.Field f : mc.getClass().getDeclaredFields()) {
+                f.setAccessible(true);
+                try {
+                    Object value = f.get(mc);
+                    if (value != null) {
+                        String name = f.getName();
+                        String className = value.getClass().getSimpleName();
+                        // Look for connection/handler related to play
+                        if (name.contains("connection") || name.contains("handler") || name.contains("network")) {
+                            if (className.contains("Connection") || className.contains("Handler") || className.contains("Network")) {
+                                connection = value;
+                                System.out.println("[SaveLogins] Found connection: " + className + " via " + name);
+                                break;
+                            }
+                        }
+                    }
+                } catch (Exception e) { /* ignore */ }
+            }
+            
+            // Method 1: Try via connection with ANY method that looks like send
+            if (connection != null) {
+                for (java.lang.reflect.Method m : connection.getClass().getMethods()) {
+                    m.setAccessible(true);
+                    String name = m.getName();
+                    int params = m.getParameterCount();
+                    // Look for any send method with 1 String or Object param
+                    if (name.contains("send") && params == 1) {
+                        Class<?>[] paramTypes = m.getParameterTypes();
+                        if (paramTypes[0] == String.class || paramTypes[0] == Object.class) {
+                            try {
+                                m.invoke(connection, message);
+                                System.out.println("[SaveLogins] Sent via " + name + ": " + message);
+                                return;
+                            } catch (Exception e) {
+                                // Try next
+                            }
+                        }
+                        // Also try methods with 2 params
+                        if (name.contains("send") && params == 2) {
+                            try {
+                                m.invoke(connection, message, null);
+                                System.out.println("[SaveLogins] Sent via " + name + ": " + message);
+                                return;
+                            } catch (Exception e) {
+                                // Continue
+                            }
                         }
                     }
                 }
-            } catch (Exception e) { /* ignore */ }
+            }
             
-            // Method 1: Try network handler
-            if (networkHandler != null) {
-                for (java.lang.reflect.Method m : networkHandler.getClass().getMethods()) {
-                    if ((m.getName().equals("sendChatMessage") || m.getName().contains("method_43")) 
-                        && m.getParameterCount() == 1) {
+            // Method 2: Try via player - check ALL methods
+            var player = mc.player;
+            if (player != null) {
+                for (java.lang.reflect.Method m : player.getClass().getMethods()) {
+                    m.setAccessible(true);
+                    String name = m.getName();
+                    int params = m.getParameterCount();
+                    
+                    // Try ANY method that could send chat
+                    if ((name.contains("send") || name.contains("chat")) && params == 1) {
                         try {
-                            m.setAccessible(true);
-                            m.invoke(networkHandler, message);
-                            System.out.println("[SaveLogins] Sent via handler: " + message);
+                            m.invoke(player, message);
+                            System.out.println("[SaveLogins] Sent via player." + name + ": " + message);
                             return;
                         } catch (Exception e) { /* continue */ }
                     }
                 }
             }
             
-            // Method 2: Try via player
-            var player = mc.player;
-            if (player != null) {
-                for (java.lang.reflect.Method m : player.getClass().getMethods()) {
-                    if ((m.getName().equals("sendChatMessage") || m.getName().contains("method_43")) 
-                        && m.getParameterCount() == 1) {
+            // Method 3: Just try the first send method we find
+            if (connection != null) {
+                for (java.lang.reflect.Method m : connection.getClass().getMethods()) {
+                    m.setAccessible(true);
+                    if (m.getName().startsWith("send") && m.getParameterCount() == 1) {
                         try {
-                            m.setAccessible(true);
-                            m.invoke(player, message);
-                            System.out.println("[SaveLogins] Sent via player: " + message);
+                            m.invoke(connection, message);
+                            System.out.println("[SaveLogins] Sent via " + m.getName());
                             return;
                         } catch (Exception e) { /* continue */ }
                     }
@@ -204,6 +244,7 @@ public class SaveLoginsCommands {
             
         } catch (Exception e) {
             System.out.println("[SaveLogins] Error: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
