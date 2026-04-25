@@ -155,69 +155,25 @@ public class SaveLoginsCommands {
      */
     private static void sendDirect(Minecraft mc, String message) {
         try {
-            // Method 1: Use MinecraftClient.openChatScreen - this opens chat with message pre-filled
-            // This is the official API in 1.21+
+            // Try to find and press the chat key binding
             try {
-                // Find openChatScreen method
-                for (java.lang.reflect.Method m : mc.getClass().getMethods()) {
-                    if (m.getName().equals("openChatScreen") && m.getParameterCount() == 1) {
-                        m.setAccessible(true);
-                        // Pass the message - this should open chat with it ready
-                        m.invoke(mc, message);
-                        System.out.println("[SaveLogins] Opened chat with: " + message);
-                        return;
-                    }
-                }
-            } catch (Exception e) {
-                System.out.println("[SaveLogins] ChatScreen error: " + e.getMessage());
-            }
-            
-            // Method 2: Try using SignedMessage API (1.21+)
-            try {
-                var player = mc.player;
-                if (player != null) {
-                    // Try creating a SignedMessage and sending it
-                    // In 1.21, there's SentMessage.Chat which wraps chat messages
-                    Class<?> sentMessageClass = null;
-                    try {
-                        sentMessageClass = Class.forName("net.minecraft.network.message.SentMessage");
-                    } catch (Exception e) {
-                        // Try alternative
-                    }
-                    
-                    if (sentMessageClass != null) {
-                        // Try to create and send
-                        for (java.lang.reflect.Method m : sentMessageClass.getMethods()) {
-                            if (m.getName().contains("chat") && m.getParameterCount() >= 0) {
-                                // Try creating the message
-                            }
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                System.out.println("[SaveLogins] SignedMessage error: " + e.getMessage());
-            }
-            
-            // Method 3: Try player.sendChat() - from Fabric discussion
-            try {
-                var player = mc.player;
-                if (player != null) {
-                    for (java.lang.reflect.Method m : player.getClass().getDeclaredMethods()) {
-                        m.setAccessible(true);
-                        String name = m.getName();
-                        if ((name.equals("sendChat") || name.contains("method_43")) && m.getParameterCount() == 1) {
-                            try {
-                                m.invoke(player, message);
-                                System.out.println("[SaveLogins] Sent via player.sendChat");
+                var options = mc.options;
+                if (options != null) {
+                    Object chatKey = findFieldValue(options, "chat");
+                    if (chatKey != null) {
+                        // Get the press method
+                        for (java.lang.reflect.Method m : chatKey.getClass().getMethods()) {
+                            if (m.getName().equals("press")) {
+                                m.setAccessible(true);
+                                m.invoke(chatKey);
+                                System.out.println("[SaveLogins] Pressed chat key");
                                 return;
-                            } catch (Exception e) {
-                                // Continue
                             }
                         }
                     }
                 }
             } catch (Exception e) {
-                System.out.println("[SaveLogins] Player send error: " + e.getMessage());
+                System.out.println("[SaveLogins] Chat key error: " + e.getMessage());
             }
             
             System.out.println("[SaveLogins] Could not send: " + message);
@@ -225,6 +181,21 @@ public class SaveLoginsCommands {
         } catch (Exception e) {
             System.out.println("[SaveLogins] Direct error: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Helper to find a field value
+     */
+    private static Object findFieldValue(Object obj, String name) {
+        try {
+            for (java.lang.reflect.Field f : obj.getClass().getDeclaredFields()) {
+                f.setAccessible(true);
+                if (f.getName().toLowerCase().contains(name.toLowerCase())) {
+                    return f.get(obj);
+                }
+            }
+        } catch (Exception e) { }
+        return null;
     }
     
     /**
